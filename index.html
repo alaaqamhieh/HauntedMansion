@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Blackwood Case — Haunted Mansion</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🗝️</text></svg>">
+<style>
+  :root{
+    --amber:#d9a441;
+    --blood:#a32020;
+    --bone:#cfc7b8;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:Georgia,'Times New Roman',serif;color:var(--bone)}
+  #app{position:fixed;inset:0}
+  canvas{display:block}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;inset:0;pointer-events:none;user-select:none;opacity:0;transition:opacity .6s}
+  #hud.visible{opacity:1}
+
+  #crosshair{position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;
+    border-radius:50%;background:rgba(207,199,184,.55);box-shadow:0 0 6px rgba(0,0,0,.8)}
+
+  #objective{position:absolute;top:22px;left:26px;max-width:380px;font-size:15px;letter-spacing:.5px;
+    text-shadow:0 1px 4px #000;line-height:1.5}
+  #objective .label{font-size:11px;text-transform:uppercase;letter-spacing:3px;color:var(--amber);opacity:.9}
+
+  #prompt{position:absolute;left:50%;top:58%;transform:translateX(-50%);font-size:16px;letter-spacing:1px;
+    background:rgba(10,8,6,.72);border:1px solid rgba(217,164,65,.5);padding:8px 18px;border-radius:3px;
+    text-shadow:0 1px 3px #000;display:none}
+  #prompt b{color:var(--amber)}
+
+  #toast{position:absolute;left:50%;top:26%;transform:translateX(-50%);max-width:520px;text-align:center;
+    font-size:17px;font-style:italic;letter-spacing:.5px;color:#e8e0cf;text-shadow:0 2px 6px #000;
+    opacity:0;transition:opacity .5s;padding:0 20px}
+
+  /* noise bar */
+  #noise-wrap{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);width:340px;text-align:center}
+  #noise-label{font-size:10px;text-transform:uppercase;letter-spacing:4px;margin-bottom:6px;color:rgba(207,199,184,.75);
+    text-shadow:0 1px 3px #000}
+  #noise-bar{position:relative;height:14px;background:rgba(8,8,10,.78);border:1px solid rgba(207,199,184,.35);
+    border-radius:2px;overflow:hidden}
+  #noise-fill{position:absolute;inset:1px auto 1px 1px;width:0%;background:linear-gradient(90deg,#3f8f4f,#c9a13b 55%,#a32020 85%);
+    background-size:338px 100%;transition:width .08s linear}
+  #noise-danger{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--blood);left:100%;
+    box-shadow:0 0 6px var(--blood);transition:left .15s linear}
+  #noise-hint{font-size:10px;letter-spacing:2px;margin-top:6px;color:var(--blood);opacity:0;transition:opacity .3s;
+    text-transform:uppercase;text-shadow:0 1px 3px #000}
+  #noise-wrap.danger #noise-hint{opacity:1}
+  #noise-wrap.danger #noise-bar{border-color:rgba(163,32,32,.8);box-shadow:0 0 12px rgba(163,32,32,.35)}
+
+  /* awareness eye */
+  #eye{position:absolute;top:20px;right:26px;width:150px;text-align:right}
+  #eye-icon{font-size:26px;filter:grayscale(1);opacity:.35;transition:all .2s;text-shadow:0 0 10px transparent}
+  #eye.alert #eye-icon{filter:none;opacity:1;text-shadow:0 0 14px var(--blood)}
+  #eye-bar{height:4px;margin-top:5px;background:rgba(8,8,10,.7);border:1px solid rgba(207,199,184,.25);border-radius:2px;overflow:hidden}
+  #eye-fill{height:100%;width:0%;background:var(--amber);transition:width .1s linear}
+  #eye.alert #eye-fill{background:var(--blood)}
+  #eye-state{font-size:9px;text-transform:uppercase;letter-spacing:3px;margin-top:4px;opacity:.7;text-shadow:0 1px 3px #000}
+
+  /* key icon */
+  #keyslot{position:absolute;bottom:34px;right:30px;font-size:13px;letter-spacing:2px;opacity:.35;text-shadow:0 1px 4px #000}
+  #keyslot.owned{opacity:1;color:var(--amber);text-shadow:0 0 12px rgba(217,164,65,.6)}
+
+  /* red vignette when spotted */
+  #danger-vignette{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .35s;
+    background:radial-gradient(ellipse at center,transparent 52%,rgba(140,10,10,.55) 100%)}
+
+  /* flash on caught */
+  #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none}
+
+  /* ---------- overlays ---------- */
+  .overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at center,rgba(12,10,14,.9) 0%,rgba(2,2,4,.97) 100%);
+    text-align:center;padding:24px;z-index:10}
+  .overlay.hidden{display:none}
+  .overlay h1{font-size:44px;font-weight:normal;letter-spacing:6px;color:var(--bone);text-shadow:0 0 24px rgba(217,164,65,.25);margin-bottom:6px}
+  .overlay h2{font-size:15px;font-weight:normal;font-style:italic;letter-spacing:2px;color:var(--amber);margin-bottom:30px;opacity:.9}
+  .overlay p{max-width:560px;line-height:1.8;font-size:15px;color:#b7ae9e;margin-bottom:26px}
+  .overlay .controls{font-size:13px;letter-spacing:1px;line-height:2.1;color:#8f8878;margin-bottom:30px}
+  .overlay .controls b{color:var(--bone);background:rgba(207,199,184,.1);border:1px solid rgba(207,199,184,.3);
+    border-radius:3px;padding:1px 8px;margin:0 2px;font-weight:normal}
+  .overlay button{pointer-events:auto;cursor:pointer;font-family:inherit;font-size:16px;letter-spacing:3px;
+    color:var(--amber);background:transparent;border:1px solid rgba(217,164,65,.6);padding:13px 44px;border-radius:2px;
+    text-transform:uppercase;transition:all .25s}
+  .overlay button:hover{background:rgba(217,164,65,.12);box-shadow:0 0 24px rgba(217,164,65,.25)}
+  #caught-overlay h1{color:var(--blood);text-shadow:0 0 30px rgba(163,32,32,.6)}
+  #win-overlay h1{color:var(--amber);text-shadow:0 0 30px rgba(217,164,65,.5)}
+  .small{font-size:11px;letter-spacing:2px;color:#6b6558;margin-top:26px}
+
+  #loading{position:fixed;inset:0;background:#000;display:flex;align-items:center;justify-content:center;
+    z-index:20;font-style:italic;letter-spacing:3px;color:#6b6558;transition:opacity .5s}
+  #loading.hidden{opacity:0;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="hud">
+  <div id="crosshair"></div>
+  <div id="objective"><div class="label">Objective</div><div id="objective-text">Find the key to the basement.</div></div>
+  <div id="prompt"></div>
+  <div id="toast"></div>
+  <div id="noise-wrap">
+    <div id="noise-label">Noise</div>
+    <div id="noise-bar"><div id="noise-fill"></div><div id="noise-danger"></div></div>
+    <div id="noise-hint">Too loud — move slowly</div>
+  </div>
+  <div id="eye"><div id="eye-icon">👁</div><div id="eye-bar"><div id="eye-fill"></div></div><div id="eye-state">Unseen</div></div>
+  <div id="keyslot">🗝 BASEMENT KEY</div>
+</div>
+<div id="danger-vignette"></div>
+<div id="flash"></div>
+
+<div id="menu-overlay" class="overlay hidden">
+  <h1>THE BLACKWOOD CASE</h1>
+  <h2>a detective mystery in a haunted mansion</h2>
+  <p>Detective, the basement of Blackwood Manor hides what you came for — but the door is locked,
+     and the key is lost somewhere in these rooms. You are not alone in here.
+     The things that roam these halls hunt by sound and sight. Watch your noise. Stay out of their gaze.</p>
+  <div class="controls">
+    <b>W A S D</b> move &nbsp;·&nbsp; <b>MOUSE</b> look &nbsp;·&nbsp; <b>E</b> interact<br>
+    hold <b>SHIFT</b> to sneak (quiet) &nbsp;·&nbsp; hold <b>SPACE</b> to run (loud)
+  </div>
+  <button id="btn-start">Enter the Manor</button>
+  <div class="small">headphones recommended</div>
+</div>
+
+<div id="pause-overlay" class="overlay hidden">
+  <h1>PAUSED</h1>
+  <button id="btn-resume">Resume</button>
+</div>
+
+<div id="caught-overlay" class="overlay hidden">
+  <h1>IT FOUND YOU</h1>
+  <p id="caught-text">The last thing you hear is your own heartbeat.</p>
+  <button id="btn-retry">Try Again</button>
+</div>
+
+<div id="win-overlay" class="overlay hidden">
+  <h1>CASE ADVANCED</h1>
+  <p>The key turns. The basement door groans open, and cold air rises from the dark below.
+     Whatever Blackwood Manor is hiding — you're about to find it.</p>
+  <button id="btn-again">Play Again</button>
+</div>
+
+<div id="loading">lighting the candles…</div>
+
+<script type="importmap">
+{ "imports": { "three": "./lib/three.module.js" } }
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
