@@ -89,14 +89,47 @@ function setState(s) {
   else if (s === 'win') { hud.hide(); showOverlay('win'); }
 }
 
+// Pointer lock can be unavailable (sandboxed iframes, some embeds). Fall back
+// to drag-to-look so the game stays playable anywhere.
+let dragLook = false;
+function enableDragLook() {
+  if (dragLook) return;
+  dragLook = true;
+  game.debugNoPointerLock = true;
+  let dragging = false;
+  const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+  renderer.domElement.addEventListener('mousedown', () => { dragging = true; });
+  addEventListener('mouseup', () => { dragging = false; });
+  addEventListener('mousemove', (e) => {
+    if (!dragging || game.state !== 'playing') return;
+    euler.setFromQuaternion(camera.quaternion);
+    euler.y -= e.movementX * 0.0025;
+    euler.x = Math.max(-1.4, Math.min(1.4, euler.x - e.movementY * 0.0025));
+    camera.quaternion.setFromEuler(euler);
+  });
+  hud.toast('Pointer lock unavailable — hold the mouse button and drag to look around.', 7);
+}
+
+function tryLock() {
+  try {
+    const p = renderer.domElement.requestPointerLock?.();
+    if (p?.catch) p.catch(() => enableDragLook());
+    setTimeout(() => {
+      if (!controls.isLocked && !dragLook) enableDragLook();
+    }, 600);
+  } catch {
+    enableDragLook();
+  }
+}
+
 document.getElementById('btn-start').addEventListener('click', () => {
   audio.init();
-  controls.lock();
+  tryLock();
   setState('playing');
   hud.toast('Find the key to the basement. Quietly.', 6);
 });
 document.getElementById('btn-resume').addEventListener('click', () => {
-  controls.lock();
+  if (!dragLook) tryLock();
   setState('playing');
 });
 document.getElementById('btn-retry').addEventListener('click', () => location.reload());
