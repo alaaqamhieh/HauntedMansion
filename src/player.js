@@ -1,5 +1,6 @@
 // First-person movement: sneak / walk / run, circle-vs-AABB collision and
-// the noise level that feeds the stealth system.
+// the noise level that feeds the stealth system. Also tracks the flashlight
+// state (Thief-style light stealth) and the hidden-in-wardrobe state.
 import * as THREE from 'three';
 
 export const EYE_HEIGHT = 1.6;
@@ -9,9 +10,11 @@ const SPEED = { sneak: 1.6, walk: 3.2, run: 5.6 };
 const NOISE = { sneak: 12, walk: 45, run: 90 };
 
 export class Player {
-  constructor(camera, colliders) {
+  constructor(camera, colliders, creakBoards = [], onCreak = null) {
     this.camera = camera;
     this.colliders = colliders; // walls + furniture AABBs
+    this.creakBoards = creakBoards;
+    this.onCreak = onCreak;
     this.pos = new THREE.Vector3(0, EYE_HEIGHT, -6.5); // foyer spawn
     this.keys = { w: false, a: false, s: false, d: false, shift: false, space: false };
     this.noise = 0;          // 0..100, decays when still
@@ -19,6 +22,9 @@ export class Player {
     this.mode = 'walk';
     this.stepDistance = 0;   // accumulates for footstep sounds
     this.enabled = false;
+    this.hidden = false;     // inside a wardrobe: invisible + immobile
+    this.flashlightOn = true;
+    this._onBoard = false;
     camera.position.copy(this.pos);
     camera.rotation.set(0, Math.PI, 0); // face the foyer doorway (south)
 
@@ -28,11 +34,11 @@ export class Player {
 
   _key(e, down) {
     switch (e.code) {
-      case 'KeyW': case 'ArrowUp': this.keys.w = down; break;
-      case 'KeyA': case 'ArrowLeft': this.keys.a = down; break;
-      case 'KeyS': case 'ArrowDown': this.keys.s = down; break;
-      case 'KeyD': case 'ArrowRight': this.keys.d = down; break;
-      case 'ShiftLeft': case 'ShiftRight': this.keys.shift = down; break;
+      case 'KeyW': case 'ArrowUp': this.keys.w = down; e.preventDefault(); break;
+      case 'KeyA': case 'ArrowLeft': this.keys.a = down; e.preventDefault(); break;
+      case 'KeyS': case 'ArrowDown': this.keys.s = down; e.preventDefault(); break;
+      case 'KeyD': case 'ArrowRight': this.keys.d = down; e.preventDefault(); break;
+      case 'ShiftLeft': case 'ShiftRight': case 'KeyC': this.keys.shift = down; break;
       case 'Space': this.keys.space = down; e.preventDefault(); break;
     }
   }
@@ -45,7 +51,21 @@ export class Player {
     return false;
   }
 
+  _overCreakBoard() {
+    for (const b of this.creakBoards) {
+      if (this.pos.x > b.minX && this.pos.x < b.maxX &&
+          this.pos.z > b.minZ && this.pos.z < b.maxZ) return true;
+    }
+    return false;
+  }
+
   update(dt) {
+    if (this.hidden) { // crouched in a wardrobe: silent and still
+      this.moving = false;
+      this.noise = Math.max(0, this.noise - 60 * dt);
+      return;
+    }
+
     const k = this.keys;
     let fwd = (k.w ? 1 : 0) - (k.s ? 1 : 0);
     let strafe = (k.d ? 1 : 0) - (k.a ? 1 : 0);
@@ -76,9 +96,19 @@ export class Player {
       // noise rises quickly toward the target for the current gait
       const target = NOISE[this.mode];
       this.noise += (target - this.noise) * Math.min(1, dt * 6);
+
+      // creaky floorboards betray you (worse when moving fast)
+      const onBoard = this._overCreakBoard();
+      if (onBoard && !this._onBoard) {
+        const spike = this.mode === 'sneak' ? 48 : 100;
+        this.noise = Math.max(this.noise, spike);
+        this.onCreak?.(this.mode);
+      }
+      this._onBoard = onBoard;
     } else {
       this.noise += (0 - this.noise) * Math.min(1, dt * 3.5);
       if (this.noise < 0.5) this.noise = 0;
+      this._onBoard = this._overCreakBoard();
     }
 
     // subtle head-bob

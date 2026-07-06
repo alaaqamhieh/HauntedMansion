@@ -60,6 +60,7 @@ export function buildHouse(scene) {
   function addBox(w, h, d, x, y, z, mat) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     m.position.set(x, y, z);
+    m.castShadow = m.receiveShadow = true;
     group.add(m);
     return m;
   }
@@ -70,12 +71,17 @@ export function buildHouse(scene) {
     const mid = (a + b) / 2;
     if (spec.dir === 'h') {
       addBox(len, WALL_H, WALL_T, mid, WALL_H / 2, spec.z, wallMat);
+      // baseboard + crown molding give the walls period detail
+      addBox(len, 0.2, WALL_T + 0.1, mid, 0.1, spec.z, trimMat);
+      addBox(len, 0.14, WALL_T + 0.12, mid, WALL_H - 0.07, spec.z, trimMat);
       wallAABBs.push({
         minX: a, maxX: b,
         minZ: spec.z - WALL_T / 2, maxZ: spec.z + WALL_T / 2,
       });
     } else {
       addBox(WALL_T, WALL_H, len, spec.x, WALL_H / 2, mid, wallMat);
+      addBox(WALL_T + 0.1, 0.2, len, spec.x, 0.1, mid, trimMat);
+      addBox(WALL_T + 0.12, 0.14, len, spec.x, WALL_H - 0.07, mid, trimMat);
       wallAABBs.push({
         minX: spec.x - WALL_T / 2, maxX: spec.x + WALL_T / 2,
         minZ: a, maxZ: b,

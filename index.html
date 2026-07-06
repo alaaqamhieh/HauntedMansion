@@ -64,6 +64,30 @@
   #keyslot{position:absolute;bottom:34px;right:30px;font-size:13px;letter-spacing:2px;opacity:.35;text-shadow:0 1px 4px #000}
   #keyslot.owned{opacity:1;color:var(--amber);text-shadow:0 0 12px rgba(217,164,65,.6)}
 
+  /* diary pages counter */
+  #pages{position:absolute;bottom:62px;right:30px;font-size:13px;letter-spacing:2px;opacity:.35;text-shadow:0 1px 4px #000}
+  #pages.some{opacity:.9;color:var(--bone)}
+  #pages.all{color:var(--amber);text-shadow:0 0 12px rgba(217,164,65,.6)}
+
+  /* wardrobe view-through-slats */
+  #hide-overlay{position:fixed;inset:0;pointer-events:none;display:none;
+    background:
+      linear-gradient(180deg,#050302 0%,#050302 12%,transparent 15%,transparent 22%,#050302 25%,
+        #050302 40%,transparent 43%,transparent 50%,#050302 53%,
+        #050302 68%,transparent 71%,transparent 78%,#050302 81%,#050302 100%)}
+  #hide-overlay .hint{position:absolute;left:50%;bottom:18%;transform:translateX(-50%);
+    font-size:13px;letter-spacing:2px;color:rgba(207,199,184,.8);text-shadow:0 1px 4px #000}
+
+  /* film grain + heavy vignette for period atmosphere */
+  #grain{position:fixed;inset:-100px;pointer-events:none;opacity:.10;z-index:5;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
+    animation:grain .28s steps(4) infinite}
+  @keyframes grain{
+    0%{transform:translate(0,0)} 25%{transform:translate(-40px,25px)}
+    50%{transform:translate(30px,-35px)} 75%{transform:translate(-25px,-20px)} 100%{transform:translate(35px,30px)}}
+  #base-vignette{position:fixed;inset:0;pointer-events:none;z-index:4;
+    background:radial-gradient(ellipse at center,transparent 45%,rgba(0,0,0,.42) 100%)}
+
   /* red vignette when spotted */
   #danger-vignette{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .35s;
     background:radial-gradient(ellipse at center,transparent 52%,rgba(140,10,10,.55) 100%)}
@@ -110,21 +134,28 @@
   </div>
   <div id="eye"><div id="eye-icon">👁</div><div id="eye-bar"><div id="eye-fill"></div></div><div id="eye-state">Unseen</div></div>
   <div id="keyslot">🗝 BASEMENT KEY</div>
+  <div id="pages">📜 DIARY PAGES 0/6</div>
 </div>
+<div id="hide-overlay"><div class="hint">You hold your breath. Interact again to step out.</div></div>
+<div id="base-vignette"></div>
+<div id="grain"></div>
 <div id="danger-vignette"></div>
 <div id="flash"></div>
 
 <div id="menu-overlay" class="overlay hidden">
   <h1>THE BLACKWOOD CASE</h1>
-  <h2>a detective mystery in a haunted mansion</h2>
-  <p>Detective, the basement of Blackwood Manor hides what you came for — but the door is locked,
-     and the key is lost somewhere in these rooms. You are not alone in here.
-     The things that roam these halls hunt by sound and sight. Watch your noise. Stay out of their gaze.</p>
+  <h2>october 1926 · a detective mystery in a haunted mansion</h2>
+  <p>Thirty years ago the Blackwood family — Lord Edmund, Lady Eleanor, little Thomas, and
+     Graves the butler — vanished from this manor in a single stormy night. The estate's new owner
+     has hired you to learn the truth. It waits behind the locked basement door.
+     Find the key. Read what the dead left behind. And remember: what still walks these halls
+     hunts by <em>sound</em> and <em>sight</em> — move slowly, stay in the dark, and hide when you must.</p>
   <div class="controls">
-    <b>W A S D</b> move &nbsp;·&nbsp; <b>MOUSE</b> look &nbsp;·&nbsp; <b>E</b> interact<br>
-    hold <b>SHIFT</b> to sneak (quiet) &nbsp;·&nbsp; hold <b>SPACE</b> to run (loud)
+    <b>W A S D</b> or <b>ARROW KEYS</b> move &nbsp;·&nbsp; <b>MOUSE</b> look &nbsp;·&nbsp; <b>ENTER</b> / <b>CLICK</b> / <b>E</b> interact<br>
+    hold <b>SHIFT</b> or <b>C</b> to sneak (quiet) &nbsp;·&nbsp; hold <b>SPACE</b> to run (loud) &nbsp;·&nbsp; <b>F</b> flashlight on/off<br>
+    flashlight off = harder to see you · creaky boards are loud · wardrobes hide you
   </div>
-  <button id="btn-start">Enter the Manor</button>
+  <button id="btn-start">Take the Case</button>
   <div class="small">headphones recommended</div>
 </div>
 
@@ -140,9 +171,9 @@
 </div>
 
 <div id="win-overlay" class="overlay hidden">
-  <h1>CASE ADVANCED</h1>
-  <p>The key turns. The basement door groans open, and cold air rises from the dark below.
-     Whatever Blackwood Manor is hiding — you're about to find it.</p>
+  <h1 id="win-title">CASE ADVANCED</h1>
+  <p id="win-text">The key turns. The basement door groans open, and cold air rises from the dark below.</p>
+  <p id="win-pages" class="small"></p>
   <button id="btn-again">Play Again</button>
 </div>
 

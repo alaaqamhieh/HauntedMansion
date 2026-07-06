@@ -59,7 +59,22 @@ function buildGhostMesh(tint) {
   const aura = new THREE.PointLight(tint, 4.5, 7, 1.6);
   aura.position.y = 1.8;
   g.add(aura);
-  return { group: g, eyeMat, aura, body };
+  // wispy trail of drifting motes around the shroud
+  const N = 26;
+  const wispBase = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    wispBase[i * 3] = (Math.random() - 0.5) * 0.9;
+    wispBase[i * 3 + 1] = 0.2 + Math.random() * 2.1;
+    wispBase[i * 3 + 2] = (Math.random() - 0.5) * 0.9;
+  }
+  const wispGeo = new THREE.BufferGeometry();
+  wispGeo.setAttribute('position', new THREE.BufferAttribute(wispBase.slice(), 3));
+  const wisps = new THREE.Points(wispGeo, new THREE.PointsMaterial({
+    color: tint, size: 0.05, transparent: true, opacity: 0.65,
+    depthWrite: false, blending: THREE.AdditiveBlending,
+  }));
+  g.add(wisps);
+  return { group: g, eyeMat, aura, body, wisps, wispBase };
 }
 
 export class Monster {
@@ -68,11 +83,13 @@ export class Monster {
     this.nav = nav;
     this.walls = wallAABBs;
     this.occluders = occluders; // walls + tall furniture (sight blockers)
-    const { group, eyeMat, aura, body } = buildGhostMesh(def.tint);
+    const { group, eyeMat, aura, body, wisps, wispBase } = buildGhostMesh(def.tint);
     this.mesh = group;
     this.eyeMat = eyeMat;
     this.aura = aura;
     this.body = body;
+    this.wisps = wisps;
+    this.wispBase = wispBase;
     this.pos = new THREE.Vector2(def.waypoints[0][0], def.waypoints[0][1]);
     this.heading = 0;
     this.state = 'patrol';
@@ -94,10 +111,13 @@ export class Monster {
   }
 
   // does this monster currently see the player?
-  _checkVision(px, pz, playerNoise) {
+  _checkVision(px, pz, player) {
+    if (player.hidden) return false; // tucked away in a wardrobe
+    // Thief-style light stealth: a lit flashlight is visible much farther
+    const range = this.def.viewRange * (player.flashlightOn ? 1.35 : 0.75);
     const dx = px - this.pos.x, dz = pz - this.pos.y;
     const dist = Math.hypot(dx, dz);
-    if (dist > this.def.viewRange) return false;
+    if (dist > range) return false;
     // facing check: mesh faces -Z when heading = 0 (eyes at z = -0.22),
     // so world facing = (-sin(heading), -cos(heading))
     const fx = -Math.sin(this.heading), fz = -Math.cos(this.heading);
@@ -177,7 +197,7 @@ export class Monster {
     const px = player.pos.x, pz = player.pos.z;
     const dist = Math.hypot(px - this.pos.x, pz - this.pos.y);
 
-    this.seesPlayer = this._checkVision(px, pz, player.noise);
+    this.seesPlayer = this._checkVision(px, pz, player);
     const heard = this._heardLevel(px, pz, player.noise);
 
     // suspicion builds while seen (faster when close), decays otherwise
@@ -255,9 +275,27 @@ export class Monster {
     this.aura.color.setHex(this.state === 'chase' ? 0xff2a1a : this.def.tint);
     this.aura.intensity = this.state === 'chase' ? 10 : 4.5 + 1.2 * Math.sin(this.t * 2.1);
     this.body.rotation.y = 0.1 * Math.sin(this.t * 0.9);
+    // shroud slowly breathes; wisps swirl around it
+    const pulse = 1 + 0.04 * Math.sin(this.t * 1.3);
+    this.body.scale.set(pulse, 1, pulse);
+    const wa = this.wisps.geometry.getAttribute('position');
+    for (let i = 0; i < wa.count; i++) {
+      wa.array[i * 3] = this.wispBase[i * 3] + 0.22 * Math.sin(this.t * 0.9 + i * 2.1);
+      wa.array[i * 3 + 1] = this.wispBase[i * 3 + 1] + 0.28 * Math.sin(this.t * 0.6 + i * 1.3);
+      wa.array[i * 3 + 2] = this.wispBase[i * 3 + 2] + 0.22 * Math.cos(this.t * 0.8 + i * 1.7);
+    }
+    wa.needsUpdate = true;
     this._syncMesh();
     this.mesh.position.y += 0.12 * Math.sin(this.t * 1.7); // ghostly hover
 
     return dist; // caller uses distance for heartbeat / catch check
+  }
+
+  // tension keeper: quietly steer this ghost toward a spot (no teleporting)
+  nudgeToward(x, z) {
+    if (this.state === 'chase') return;
+    this.state = 'investigate';
+    this.target.set(x, z);
+    this._routeTo(x, z);
   }
 }

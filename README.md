@@ -6,8 +6,15 @@ haunt its halls hunt you by sound and sight.
 
 ## How to play
 
-- **W A S D** — move, **mouse** — look, **E** — interact
-- Hold **SHIFT** to sneak (quiet), hold **SPACE** to run (loud)
+- **W A S D** or **Arrow keys** — move, **mouse** — look
+- **Enter**, **E**, or **mouse click** — interact (when a prompt is shown)
+- Hold **SHIFT** or **C** to sneak (quiet), hold **SPACE** to run (loud)
+- **F** — flashlight on/off: light helps you see but makes you visible farther;
+  darkness hides you
+- Hide inside **wardrobes** — but if something watched you climb in, it knows
+- Avoid the dark, warped **creaky floorboards**: they scream underfoot
+- Collect the **6 diary pages** to learn what really happened — find them all
+  before opening the basement for the true ending
 - The **noise bar** at the bottom shows how much sound you're making. The red
   tick is the loudest you can be right now without the nearest monster hearing
   you — when a monster is close, even walking is too loud. Sneak.

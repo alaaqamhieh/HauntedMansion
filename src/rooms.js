@@ -2,8 +2,8 @@
 // light color and props so no two rooms feel alike. Also places the clue
 // note, the (randomized) basement key and the basement door.
 import * as THREE from 'three';
-import { ROOMS } from './house.js';
-import { woodTexture, tileTexture, stoneTexture, carpetTexture } from './textures.js';
+import { ROOMS, WALL_H } from './house.js';
+import { woodTexture, tileTexture, stoneTexture, carpetTexture, cobwebTexture } from './textures.js';
 
 const KEY_SPOTS = [
   { room: 'study', pos: [-19.8, 1.42, 8], desc: 'on the fireplace mantel in the STUDY' },
@@ -52,6 +52,7 @@ export function furnishRooms(scene) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), M({ map: tex, color: 0xbbbbbb, roughness: 0.9 }));
     m.rotation.x = -Math.PI / 2;
     m.position.set((r.x[0] + r.x[1]) / 2, y, (r.z[0] + r.z[1]) / 2);
+    m.receiveShadow = true;
     group.add(m);
     return m;
   }
@@ -85,11 +86,9 @@ export function furnishRooms(scene) {
     // grandfather clock (tall)
     box(0.9, 2.5, 0.5, -6.4, 1.25, -4, darkWood); tall(-6.4, -4, 1.0, 0.6);
     box(0.55, 0.55, 0.1, -6.4, 1.9, -3.72, brass);
-    // portraits
-    for (const px of [-3.5, 3.5]) {
-      box(1.3, 1.8, 0.08, px, 2.0, -13.8, darkWood);
-      box(1.05, 1.55, 0.04, px, 2.0, -13.74, M({ color: 0x141018 }));
-    }
+    // faded old portrait (right side; the left spot belongs to Lord Blackwood)
+    box(1.3, 1.8, 0.08, 3.5, 2.0, -13.8, darkWood);
+    box(1.05, 1.55, 0.04, 3.5, 2.0, -13.74, M({ color: 0x141018 }));
     // side table + vase
     box(1.2, 0.85, 0.5, 6.3, 0.42, -6, midWood); solid(6.3, -6, 1.3, 0.6);
     cyl(0.14, 0.2, 0.5, 6.3, 1.1, -6, M({ color: 0x33424e, roughness: 0.3 }));
@@ -306,6 +305,227 @@ export function furnishRooms(scene) {
     });
   }
 
+  // ================================================ FAMILY PORTRAITS ======
+  // The user's pictures, hung in ornate gilt frames with picture lights.
+  const texLoader = new THREE.TextureLoader();
+  function hangPainting(url, w, h, x, y, z, ry) {
+    const g = new THREE.Group();
+    const gilt = M({ color: 0xa8842f, roughness: 0.35, metalness: 0.65 });
+    const outer = new THREE.Mesh(new THREE.BoxGeometry(w + 0.24, h + 0.24, 0.09), gilt);
+    const inner = new THREE.Mesh(new THREE.BoxGeometry(w + 0.1, h + 0.1, 0.11), darkWood);
+    const tex = texLoader.load(url);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const canvas = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+      new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 }));
+    canvas.position.z = 0.062;
+    // small brass picture light above the frame
+    const lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.5, 8), brass);
+    lamp.rotation.z = Math.PI / 2;
+    lamp.position.set(0, h / 2 + 0.24, 0.12);
+    const glow = new THREE.PointLight(0xffd9a0, 5, 3.5, 1.8);
+    glow.position.set(0, h / 2 + 0.1, 0.45);
+    g.add(outer, inner, canvas, lamp, glow);
+    g.position.set(x, y, z);
+    g.rotation.y = ry;
+    group.add(g);
+    return g;
+  }
+  // Lord Blackwood presides over the foyer; the "cousins" hang by the library desk
+  hangPainting('./assets/portraits/lord-blackwood.jpg', 1.5, 1.84, -3.5, 2.05, -13.72, 0);
+  hangPainting('./assets/portraits/the-cousins.jpg', 1.05, 1.87, -7.24, 1.95, -4.5, -Math.PI / 2);
+  const paintingSpots = {
+    lord: { pos: new THREE.Vector3(-3.5, 1.6, -13.7), radius: 2.6, label: 'Examine the portrait' },
+    cousins: { pos: new THREE.Vector3(-7.4, 1.6, -4.5), radius: 2.4, label: 'Examine the strange painting' },
+  };
+
+  // ==================================================== HIDING WARDROBES ==
+  const wardrobes = [];
+  function wardrobe(cx, cz, fx, fz) { // f = outward facing direction (unit axis)
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.5, 0.85), darkWood);
+    body.position.y = 1.25;
+    body.castShadow = body.receiveShadow = true;
+    g.add(body);
+    for (const side of [-1, 1]) { // double doors with seam + knobs
+      const door = new THREE.Mesh(new THREE.BoxGeometry(0.62, 2.26, 0.06), midWood);
+      door.position.set(side * 0.34, 1.22, 0.44);
+      g.add(door);
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), brass);
+      knob.position.set(side * 0.08, 1.22, 0.49);
+      g.add(knob);
+    }
+    const crown = new THREE.Mesh(new THREE.BoxGeometry(1.56, 0.12, 1.0), darkWood);
+    crown.position.y = 2.56;
+    g.add(crown);
+    g.position.set(cx, 0, cz);
+    g.rotation.y = Math.atan2(fx, fz); // rotate local +z to face (fx,fz)
+    group.add(g);
+    tall(cx, cz, Math.abs(fx) > 0.5 ? 0.9 : 1.5, Math.abs(fx) > 0.5 ? 1.5 : 0.9);
+    wardrobes.push({
+      pos: new THREE.Vector3(cx + fx * 1.0, 1.2, cz + fz * 1.0), // interact point (in front)
+      radius: 1.6,
+      label: 'Hide in the wardrobe',
+      hideAt: { x: cx + fx * 0.1, z: cz + fz * 0.1 },
+      exitAt: { x: cx + fx * 1.25, z: cz + fz * 1.25 },
+      lookYaw: Math.atan2(-fx, -fz), // face outward while hidden
+      center: { x: cx, z: cz },
+    });
+  }
+  wardrobe(-20.35, -3.4, 1, 0);   // library, west wall
+  wardrobe(-7.65, 12.5, -1, 0);   // study, east wall
+  wardrobe(6.35, 11.4, -1, 0);    // kitchen pantry, east wall
+
+  // ==================================================== CREAKY FLOORBOARDS
+  const creakBoards = [];
+  const creakMat = M({ map: woodTexture('#241505', '#120a02', 2), color: 0x8a7a66, roughness: 1 });
+  for (const [bx, bz, bw, bd] of [
+    [0.6, -1.1, 1.5, 1.1],    // hallway by foyer door
+    [-15.6, 0.4, 1.3, 1.2],   // hallway west stretch
+    [9.8, 0.7, 1.4, 1.1],     // hallway east stretch
+    [-14.2, -3.1, 1.3, 1.2],  // inside library door
+    [14.1, -3.2, 1.3, 1.2],   // inside dining door
+    [0.3, 3.1, 1.4, 1.2],     // inside kitchen door
+    [-13.7, 3.2, 1.3, 1.2],   // inside study door
+    [14.3, 3.2, 1.3, 1.2],    // inside conservatory door
+    [-22.4, 0.6, 1.2, 1.3],   // cellar corridor mouth
+  ]) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(bw, bd), creakMat);
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(bx, 0.02, bz);
+    group.add(m);
+    creakBoards.push({ minX: bx - bw / 2, maxX: bx + bw / 2, minZ: bz - bd / 2, maxZ: bz + bd / 2 });
+  }
+
+  // ======================================================= STORM WINDOWS ==
+  const windowGlassMats = [];
+  function stormWindow(x, z, nx, nz) { // n = inward normal
+    const ry = Math.atan2(nx, nz);
+    const g = new THREE.Group();
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.1, 0.1), darkWood);
+    g.add(frame);
+    const glassMat = new THREE.MeshStandardMaterial({
+      color: 0x141c2c, roughness: 0.15,
+      emissive: 0x8fb0e0, emissiveIntensity: 0.35,
+    });
+    windowGlassMats.push(glassMat);
+    const glass = new THREE.Mesh(new THREE.PlaneGeometry(1.24, 1.86), glassMat);
+    glass.position.z = 0.06;
+    g.add(glass);
+    // muntin cross
+    const mv = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.9, 0.04), darkWood);
+    mv.position.z = 0.08; g.add(mv);
+    const mh = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.05, 0.04), darkWood);
+    mh.position.z = 0.08; g.add(mh);
+    // heavy old curtains
+    for (const side of [-1, 1]) {
+      const cur = new THREE.Mesh(new THREE.BoxGeometry(0.34, 2.5, 0.16), M({ color: 0x3a1d24, roughness: 1 }));
+      cur.position.set(side * 0.95, 0.05, 0.14);
+      g.add(cur);
+    }
+    const moonSpill = new THREE.PointLight(0x7a9cd8, 7, 7, 1.9);
+    moonSpill.position.set(0, 0.3, 0.8);
+    g.add(moonSpill);
+    g.position.set(x, 2.0, z);
+    g.rotation.y = ry;
+    group.add(g);
+  }
+  stormWindow(-5.3, -13.78, 0, 1);   // foyer, left of the stairs
+  stormWindow(5.3, -13.78, 0, 1);    // foyer, right of the stairs
+  stormWindow(-20.78, -5, 1, 0);     // library west
+  stormWindow(20.78, -5, -1, 0);     // dining east
+  stormWindow(-20.78, 11, 1, 0);     // study west
+  stormWindow(-2.5, 13.78, 0, -1);   // kitchen south
+  stormWindow(13, 13.78, 0, -1);     // conservatory south
+  stormWindow(18.5, 13.78, 0, -1);   // conservatory south 2
+
+  // ================================================= COBWEBS + DUST + DECOR
+  const webTex = cobwebTexture();
+  const webMat = new THREE.MeshBasicMaterial({
+    map: webTex, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false,
+  });
+  for (const [wx, wy, wz, wry] of [
+    [6.6, 3.25, -13.6, Math.PI * 1.25],
+    [-20.7, 3.25, -13.6, Math.PI * 1.75],
+    [-26.7, 3.2, -1.7, Math.PI * 1.75],
+    [-26.7, 3.2, 1.7, Math.PI * 1.25],
+    [-20.7, 3.25, 13.6, Math.PI * 0.75],
+    [20.7, 3.25, -2.35, Math.PI * 0.25],
+  ]) {
+    const web = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.1), webMat);
+    web.position.set(wx, wy, wz);
+    web.rotation.y = wry;
+    web.rotation.x = 0.35;
+    group.add(web);
+  }
+  // drifting dust motes
+  {
+    const N = 380;
+    const base = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) {
+      base[i * 3] = -26 + Math.random() * 47;
+      base[i * 3 + 1] = 0.3 + Math.random() * 2.9;
+      base[i * 3 + 2] = -13.5 + Math.random() * 27;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(base.slice(), 3));
+    const dust = new THREE.Points(geo, new THREE.PointsMaterial({
+      color: 0xcfc7b0, size: 0.035, transparent: true, opacity: 0.35,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    }));
+    group.add(dust);
+    const attr = geo.getAttribute('position');
+    flickers.push((t) => {
+      for (let i = 0; i < N; i++) {
+        attr.array[i * 3] = base[i * 3] + 0.25 * Math.sin(t * 0.21 + i * 1.7);
+        attr.array[i * 3 + 1] = base[i * 3 + 1] + 0.30 * Math.sin(t * 0.13 + i * 2.3);
+      }
+      attr.needsUpdate = true;
+    });
+  }
+  // ceiling beams in the grand rooms
+  const beamMat = M({ color: 0x241a10, roughness: 0.95 });
+  for (const [xa, xb, zs] of [
+    [-6.8, 6.8, [-12, -9.5, -7, -4.5]],    // foyer
+    [7.2, 20.8, [-12, -9.5, -7, -4.5]],    // dining
+    [-20.8, -7.2, [4.5, 7, 9.5, 12]],      // study
+  ]) {
+    for (const bz of zs) {
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(xb - xa, 0.22, 0.2), beamMat);
+      beam.position.set((xa + xb) / 2, WALL_H - 0.12, bz);
+      beam.castShadow = true;
+      group.add(beam);
+    }
+  }
+  // stone pillars in the cellar corridor
+  for (const [px, pz] of [[-23, -1.6], [-23, 1.6], [-25.2, -1.6], [-25.2, 1.6]]) {
+    const pil = cyl(0.22, 0.28, WALL_H, px, WALL_H / 2, pz, M({ map: stoneTexture('#3a3634', 2), color: 0x999999 }));
+    pil.castShadow = true;
+    solid(px, pz, 0.5, 0.5);
+  }
+
+  // ======================================================== DIARY PAGES ===
+  // 5 physical pages; a 6th is found behind Lord Blackwood's portrait.
+  const pageMat = new THREE.MeshStandardMaterial({
+    color: 0xd8cba0, roughness: 1, emissive: 0x8a7a40, emissiveIntensity: 0.4,
+    side: THREE.DoubleSide,
+  });
+  const pageItems = [];
+  for (const [id, px, py, pz] of [
+    [0, -10, 0.53, -9.4],     // library armchair
+    [2, 20.42, 1.04, -7.4],   // dining sideboard
+    [3, 0.5, 0.945, 8.25],    // kitchen island
+    [4, -12.7, 0.87, 7.15],   // study desk
+    [5, 17.3, 0.51, 12.75],   // conservatory bench
+  ]) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.34), pageMat);
+    m.rotation.x = -Math.PI / 2;
+    m.rotation.z = Math.random() * Math.PI;
+    m.position.set(px, py, pz);
+    group.add(m);
+    pageItems.push({ id, mesh: m, pos: new THREE.Vector3(px, py, pz), radius: 2.0, taken: false });
+  }
+  flickers.push((t) => { pageMat.emissiveIntensity = 0.3 + 0.18 * Math.sin(t * 2.4); });
+
   // ======================================================== KEY + NOTE ====
   const keySpot = KEY_SPOTS[Math.floor(Math.random() * KEY_SPOTS.length)];
   const keyGroup = new THREE.Group();
@@ -341,10 +561,16 @@ export function furnishRooms(scene) {
     keyGroup,
     noteMesh,
     basementDoorMesh,
+    wardrobes,
+    creakBoards,
+    windowGlassMats,
+    pageItems,
     interactables: {
       note: { pos: new THREE.Vector3(-9.35, 0.8, -5.45), radius: 2.2, label: 'Read the note' },
       key: { pos: new THREE.Vector3(...keySpot.pos), radius: 2.2, label: 'Take the basement key' },
       door: { pos: new THREE.Vector3(-26.6, 1.25, 0), radius: 2.6, label: 'Open the basement door' },
+      portraitLord: paintingSpots.lord,
+      portraitCousins: paintingSpots.cousins,
     },
   };
 }

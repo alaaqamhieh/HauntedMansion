@@ -56,6 +56,99 @@ export class GameAudio {
     const windLfo = ctx.createOscillator(); windLfo.frequency.value = 0.11;
     const windLfoG = ctx.createGain(); windLfoG.gain.value = 300;
     windLfo.connect(windLfoG); windLfoG.connect(windBP.frequency); windLfo.start();
+
+    // steady rain against the windows
+    const rain = ctx.createBufferSource();
+    rain.buffer = this.noiseBuf; rain.loop = true;
+    rain.playbackRate.value = 0.85;
+    const rainLP = ctx.createBiquadFilter();
+    rainLP.type = 'lowpass'; rainLP.frequency.value = 900; rainLP.Q.value = 0.4;
+    const rainHP = ctx.createBiquadFilter();
+    rainHP.type = 'highpass'; rainHP.frequency.value = 350;
+    const rainGain = ctx.createGain(); rainGain.gain.value = 0.028;
+    rain.connect(rainHP); rainHP.connect(rainLP); rainLP.connect(rainGain);
+    rainGain.connect(this.master);
+    rain.start();
+
+    // one whisper voice per ghost, panned by where it is relative to you
+    this.whispers = [];
+    for (let i = 0; i < 3; i++) {
+      const src = ctx.createBufferSource();
+      src.buffer = this.noiseBuf; src.loop = true;
+      src.playbackRate.value = 0.28 + i * 0.07;
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = 1400 + i * 500; bp.Q.value = 14;
+      const trem = ctx.createOscillator();
+      trem.frequency.value = 2.1 + i * 0.9;
+      const tremG = ctx.createGain(); tremG.gain.value = 0.5;
+      const voiceG = ctx.createGain(); voiceG.gain.value = 0; // driven per-frame
+      trem.connect(tremG); tremG.connect(voiceG.gain);
+      const pan = ctx.createStereoPanner();
+      src.connect(bp); bp.connect(voiceG); voiceG.connect(pan); pan.connect(this.master);
+      src.start(); trem.start();
+      this.whispers.push({ gain: voiceG, pan });
+    }
+  }
+
+  // ghosts: [{dist, pan}] — pan -1..1 (left..right); closer = louder whisper
+  updateWhispers(ghosts) {
+    if (!this.ctx || !this.whispers) return;
+    for (let i = 0; i < this.whispers.length; i++) {
+      const w = this.whispers[i];
+      const g = ghosts[i];
+      const vol = g && g.dist < 10 ? 0.10 * (1 - g.dist / 10) : 0;
+      w.gain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.25);
+      if (g) w.pan.pan.setTargetAtTime(g.pan, this.ctx.currentTime, 0.15);
+    }
+  }
+
+  creak() {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(240 + Math.random() * 120, ctx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(90, ctx.currentTime + 0.5);
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass'; f.frequency.value = 500; f.Q.value = 9;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.24, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.55);
+    o.connect(f); f.connect(g); g.connect(this.master);
+    o.start(); o.stop(ctx.currentTime + 0.6);
+  }
+
+  thunder(delaySec = 0) {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const t0 = ctx.currentTime + delaySec;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuf;
+    src.playbackRate.value = 0.32;
+    src.loop = true;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(400, t0);
+    lp.frequency.exponentialRampToValueAtTime(60, t0 + 2.8);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(0.5, t0 + 0.12);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 3.2);
+    src.connect(lp); lp.connect(g); g.connect(this.master);
+    src.start(t0); src.stop(t0 + 3.4);
+  }
+
+  page() {
+    if (!this.ctx) return;
+    this._noiseBurst(0.25, 3000, 1.2, 0.12, 'highpass'); // paper rustle
+    const ctx = this.ctx;
+    const o = ctx.createOscillator();
+    o.type = 'sine'; o.frequency.value = 880;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.08, ctx.currentTime + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.7);
+    o.connect(g); g.connect(this.master);
+    o.start(); o.stop(ctx.currentTime + 0.8);
   }
 
   _noiseBurst(dur, freq, q, gain, type = 'bandpass') {

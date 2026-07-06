@@ -106,6 +106,39 @@ export function wallpaperTexture(base = '#2c2a33', stripe = '#242230', repeat = 
   return toTexture(c, repeat, 2);
 }
 
+export function cobwebTexture() {
+  const [c, ctx] = makeCanvas(128);
+  ctx.clearRect(0, 0, 128, 128);
+  ctx.strokeStyle = 'rgba(210,205,195,0.55)';
+  ctx.lineWidth = 1;
+  // radial spokes from a corner
+  for (let i = 0; i <= 8; i++) {
+    const a = (i / 8) * Math.PI / 2;
+    ctx.beginPath();
+    ctx.moveTo(2, 2);
+    ctx.lineTo(2 + Math.cos(a) * 126, 2 + Math.sin(a) * 126);
+    ctx.stroke();
+  }
+  // sagging rings
+  for (let r = 18; r < 126; r += 16) {
+    ctx.beginPath();
+    for (let i = 0; i <= 8; i++) {
+      const a = (i / 8) * Math.PI / 2;
+      const rr = r * (1 + 0.06 * Math.sin(i * 2.7 + r));
+      const x = 2 + Math.cos(a) * rr, y = 2 + Math.sin(a) * rr;
+      if (i === 0) ctx.moveTo(x, y);
+      else {
+        const pa = ((i - 0.5) / 8) * Math.PI / 2;
+        ctx.quadraticCurveTo(2 + Math.cos(pa) * r * 1.08, 2 + Math.sin(pa) * r * 1.08, x, y);
+      }
+    }
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 export function carpetTexture(base = '#4d1f24', motif = '#6b3a2a', repeat = 2) {
   const [c, ctx] = makeCanvas(256);
   ctx.fillStyle = base;

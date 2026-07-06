@@ -17,6 +17,7 @@ export class HUD {
       eyeFill: $('eye-fill'),
       eyeState: $('eye-state'),
       keyslot: $('keyslot'),
+      pages: $('pages'),
       vignette: $('danger-vignette'),
       flash: $('flash'),
     };
@@ -30,7 +31,7 @@ export class HUD {
 
   setPrompt(text) {
     if (text) {
-      this.el.prompt.innerHTML = `<b>[E]</b> ${text}`;
+      this.el.prompt.innerHTML = `<b>[⏎ ENTER]</b> ${text}`;
       this.el.prompt.style.display = 'block';
     } else {
       this.el.prompt.style.display = 'none';
@@ -46,6 +47,12 @@ export class HUD {
   }
 
   keyObtained() { this.el.keyslot.classList.add('owned'); }
+
+  setPages(found, total) {
+    this.el.pages.textContent = `📜 DIARY PAGES ${found}/${total}`;
+    this.el.pages.classList.toggle('some', found > 0);
+    this.el.pages.classList.toggle('all', found >= total);
+  }
 
   // noise: 0..100; safeNoise: loudest the player can be right now unheard
   updateNoise(noise, safeNoise) {
